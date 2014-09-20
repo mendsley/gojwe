@@ -94,6 +94,17 @@ func VerifyAndDecryptDraft7(jwe string, key crypto.PrivateKey) ([]byte, error) {
 			return nil, fmt.Errorf("Failed to decrypt encryption key: %v", err)
 		}
 
+	case "RSA1_5":
+		rsaKey, ok := key.(*rsa.PrivateKey)
+		if !ok {
+			return nil, fmt.Errorf("Expected RSA private key. Got %T", key)
+		}
+
+		encryptionKey, err = rsa.DecryptPKCS1v15(rand.Reader, rsaKey, encryptionKeyData)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to decrypt encryption key: %v", err)
+		}
+
 	default:
 		return nil, fmt.Errorf("Unsupported ALG keytype %s", header.Alg)
 	}
