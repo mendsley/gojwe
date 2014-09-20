@@ -35,6 +35,7 @@ import (
 	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -131,12 +132,22 @@ func VerifyAndDecryptDraft7(jwe string, key crypto.PrivateKey) ([]byte, error) {
 	var plainText []byte
 
 	switch header.Enc {
-	case "A128CBC+HS256":
+	case "A128CBC+HS256", "A256CBC+HS512":
 		// derive keys
-		encKey, macKey := concatKDF(encryptionKey, header.Enc, 128, 256)
+		var encKey, macKey []byte
+		var hfunc func() hash.Hash
+		if header.Enc == "A128CBC+HS256" {
+			encKey, macKey = concatKDF(encryptionKey, header.Enc, 128, 256)
+			hfunc = sha256.New
+		} else if header.Enc == "A256CBC+HS512" {
+			encKey, macKey = concatKDF(encryptionKey, header.Enc, 256, 512)
+			hfunc = sha512.New
+		} else {
+			panic("Bad ENC logic for type: " + header.Enc)
+		}
 
 		// verify authtag
-		hm := hmac.New(sha256.New, macKey)
+		hm := hmac.New(hfunc, macKey)
 		io.WriteString(hm, parts[0])
 		io.WriteString(hm, ".")
 		io.WriteString(hm, parts[1])
