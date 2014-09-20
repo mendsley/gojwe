@@ -184,7 +184,8 @@ func verifyAndDecrypt(draft int, jwe string, key crypto.PrivateKey) ([]byte, err
 		var scratch [8]byte
 		binary.BigEndian.PutUint64(scratch[:], uint64(len(parts[0]))*8)
 		hm.Write(scratch[:])
-		signature := hm.Sum(nil)[:len(macKey)]
+		signature := hm.Sum(nil)
+		signature = signature[:len(signature)/2]
 		if !hmac.Equal(authTag, signature) {
 			return nil, errors.New("Integrity check failed")
 		}
