@@ -36,6 +36,7 @@ import (
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -60,12 +61,22 @@ type EncryptionMethod string
 const (
 	ENC_A128CBC_HS256_v7 = EncryptionMethod("A128CBC+HS256")
 	ENC_A256CBC_HS512_v7 = EncryptionMethod("A256CBC+H512")
+	ENC_A128CBC_HS256    = EncryptionMethod("A128CBC-HS256")
+	ENC_A256CBC_HS512    = EncryptionMethod("A256CBC-HS512")
 	ENC_A128GCM          = EncryptionMethod("A128GCM")
 	ENC_A256GCM          = EncryptionMethod("A256GCM")
 )
 
-// Verify and decrypt a draft-7 JWE object
 func VerifyAndDecryptDraft7(jwe string, key crypto.PrivateKey) ([]byte, error) {
+	return verifyAndDecrypt(7, jwe, key)
+}
+
+// Verify and decrypt a JWE object
+func VerifyAndDecrypt(jwe string, key crypto.PrivateKey) ([]byte, error) {
+	return verifyAndDecrypt(28, jwe, key)
+}
+
+func verifyAndDecrypt(draft int, jwe string, key crypto.PrivateKey) ([]byte, error) {
 	parts := strings.Split(jwe, ".")
 	if len(parts) != 5 {
 		return nil, errors.New("Wrong number of parts")
@@ -162,6 +173,36 @@ func VerifyAndDecryptDraft7(jwe string, key crypto.PrivateKey) ([]byte, error) {
 	var plainText []byte
 
 	switch header.Enc {
+	case ENC_A128CBC_HS256:
+		encKey, macKey := encryptionKey[16:], encryptionKey[:16]
+
+		// verify authtag
+		hm := hmac.New(sha256.New, macKey)
+		io.WriteString(hm, parts[0])
+		hm.Write(iv)
+		hm.Write(cipherText)
+		var scratch [8]byte
+		binary.BigEndian.PutUint64(scratch[:], uint64(len(parts[0]))*8)
+		hm.Write(scratch[:])
+		signature := hm.Sum(nil)[:len(macKey)]
+		if !hmac.Equal(authTag, signature) {
+			return nil, errors.New("Integrity check failed")
+		}
+
+		// decrypt the ciphertext (in-place)
+		block, err := aes.NewCipher(encKey)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to create an AES block cipher: %v", err)
+		}
+
+		c := cipher.NewCBCDecrypter(block, iv)
+		c.CryptBlocks(cipherText, cipherText)
+		plainText = cipherText
+
+		// remove PCKS#7 padding
+		padding := int(plainText[len(plainText)-1])
+		plainText = plainText[:len(plainText)-padding]
+
 	case ENC_A128CBC_HS256_v7, ENC_A256CBC_HS512_v7:
 		// derive keys
 		var encSize, macSize int
@@ -206,13 +247,21 @@ func VerifyAndDecryptDraft7(jwe string, key crypto.PrivateKey) ([]byte, error) {
 		plainText = plainText[:len(plainText)-padding]
 
 	case ENC_A128GCM, ENC_A256GCM:
-		// create the "additional data" for the GCM cipher
-		additionalData := new(bytes.Buffer)
-		additionalData.WriteString(parts[0])
-		additionalData.WriteRune('.')
-		additionalData.WriteString(parts[1])
-		additionalData.WriteRune('.')
-		additionalData.WriteString(parts[2])
+		var additionalData []byte
+		if draft < 10 {
+			// create the "additional data" for the GCM cipher
+			buffer := new(bytes.Buffer)
+			buffer.WriteString(parts[0])
+			buffer.WriteRune('.')
+			buffer.WriteString(parts[1])
+			if draft < 9 {
+				buffer.WriteRune('.')
+				buffer.WriteString(parts[2])
+			}
+			additionalData = buffer.Bytes()
+		} else {
+			additionalData = []byte(parts[0])
+		}
 
 		// create the authenticating cipher
 		block, err := aes.NewCipher(encryptionKey)
@@ -225,7 +274,7 @@ func VerifyAndDecryptDraft7(jwe string, key crypto.PrivateKey) ([]byte, error) {
 		}
 
 		// decrypt the cipher text (in-place)
-		_, err = c.Open(cipherText[:0], iv, append(cipherText, authTag...), additionalData.Bytes())
+		_, err = c.Open(cipherText[:0], iv, append(cipherText, authTag...), additionalData)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to decrypt: %v", err)
 		}
