@@ -145,17 +145,19 @@ func VerifyAndDecryptDraft7(jwe string, key crypto.PrivateKey) ([]byte, error) {
 	switch header.Enc {
 	case "A128CBC+HS256", "A256CBC+HS512":
 		// derive keys
-		var encKey, macKey []byte
+		var encSize, macSize int
 		var hfunc func() hash.Hash
 		if header.Enc == "A128CBC+HS256" {
-			encKey, macKey = concatKDF(encryptionKey, header.Enc, 128, 256)
+			encSize, macSize = 128, 256
 			hfunc = sha256.New
 		} else if header.Enc == "A256CBC+HS512" {
-			encKey, macKey = concatKDF(encryptionKey, header.Enc, 256, 512)
+			encSize, macSize = 256, 512
 			hfunc = sha512.New
 		} else {
 			panic("Bad ENC logic for type: " + header.Enc)
 		}
+
+		encKey, macKey := concatKDF(encryptionKey, header.Enc, encSize, macSize)
 
 		// verify authtag
 		hm := hmac.New(hfunc, macKey)
