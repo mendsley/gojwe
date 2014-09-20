@@ -88,7 +88,7 @@ func TestDecode7_RSAES_OAEP_AES_GCM(t *testing.T) {
 		210, 7, 121, 78, 91, 79, 57, 251, 138, 132, 220, 60,
 		224, 173, 56, 224, 201})
 
-	data, err := VerifyAndDecryptDraft7(jwe, privKey)
+	data, err := VerifyAndDecryptDraft7(jwe, ProviderFromKey(privKey))
 	if err != nil {
 		t.Fatal("VerifyAndDecryptDraft7 failed: ", err)
 	}
@@ -156,7 +156,7 @@ func TestDecode7_RSAES_PKCS1_V1_5_AES_CBC(t *testing.T) {
 		3, 136, 229, 134, 131, 93, 139, 50, 182, 204, 93,
 		130, 89})
 
-	data, err := VerifyAndDecryptDraft7(jwe, privKey)
+	data, err := VerifyAndDecryptDraft7(jwe, ProviderFromKey(privKey))
 	if err != nil {
 		t.Fatal("VerifyAndDecryptDraft7 failed: ", err)
 	}
@@ -171,7 +171,7 @@ func TestDecode7_AES_WRAP_AES_GCM(t *testing.T) {
 	privKey := []byte{25, 172, 32, 130, 225, 114, 26, 181, 138, 106, 254, 192, 95, 133,
 		74, 82}
 
-	data, err := VerifyAndDecryptDraft7(jwe, privKey)
+	data, err := VerifyAndDecryptDraft7(jwe, ProviderFromKey(privKey))
 	if err != nil {
 		t.Fatal("VerifyAndDecryptDraft7 failed: ", err)
 	}

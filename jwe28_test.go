@@ -112,7 +112,7 @@ func TestDecode28_RSAES_OAEP_AES_GCM(t *testing.T) {
 		t.Fatal("keyFromJWK: ", err)
 	}
 
-	data, err := VerifyAndDecrypt(jwe, privKey)
+	data, err := VerifyAndDecrypt(jwe, ProviderFromKey(privKey))
 	if err != nil {
 		t.Fatal("VerifyAndDecrypt failed: ", err)
 	}
@@ -132,7 +132,7 @@ func TestDecode28_RSAES_PKCS1_V1_5_AES_128_CBC_HMAC_SHA256(t *testing.T) {
 		t.Fatal("keyFromJWK: ", err)
 	}
 
-	data, err := VerifyAndDecrypt(jwe, privKey)
+	data, err := VerifyAndDecrypt(jwe, ProviderFromKey(privKey))
 	if err != nil {
 		t.Fatal("VerifyAndDecrypt failed: ", err)
 	}
@@ -152,7 +152,7 @@ func TestDecode28_AES_WRAP_AES_128_CBC_MHAC_SHA_256(t *testing.T) {
 		t.Fatal("keyFromJWK: ", err)
 	}
 
-	data, err := VerifyAndDecrypt(jwe, privKey)
+	data, err := VerifyAndDecrypt(jwe, ProviderFromKey(privKey))
 	if err != nil {
 		t.Fatal("VerifyAndDecrypt failed: ", err)
 	}

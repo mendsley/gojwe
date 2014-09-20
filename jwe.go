@@ -67,27 +67,48 @@ const (
 	ENC_A256GCM          = EncryptionMethod("A256GCM")
 )
 
-func VerifyAndDecryptDraft7(jwe string, key crypto.PrivateKey) ([]byte, error) {
-	return verifyAndDecrypt(7, jwe, key)
+// The JWE header
+type Header struct {
+	Alg Algorithm        `json:"alg"`
+	Enc EncryptionMethod `json:"enc"`
+	Zip string           `json:"zip"`
+}
+
+// interface to retrieve the private key needed to decrypt the JWE
+type KeyProvider interface {
+	GetKey(header Header) (crypto.PrivateKey, error)
+}
+
+// convert a single key into a provider
+func ProviderFromKey(key crypto.PrivateKey) KeyProvider {
+	return singleKey{key: key}
+}
+
+type singleKey struct {
+	key crypto.PrivateKey
+}
+
+func (sk singleKey) GetKey(h Header) (crypto.PrivateKey, error) {
+	return sk.key, nil
+}
+
+func VerifyAndDecryptDraft7(jwe string, kp KeyProvider) ([]byte, error) {
+	return verifyAndDecrypt(7, jwe, kp)
 }
 
 // Verify and decrypt a JWE object
-func VerifyAndDecrypt(jwe string, key crypto.PrivateKey) ([]byte, error) {
-	return verifyAndDecrypt(28, jwe, key)
+func VerifyAndDecrypt(jwe string, kp KeyProvider) ([]byte, error) {
+	return verifyAndDecrypt(28, jwe, kp)
 }
 
-func verifyAndDecrypt(draft int, jwe string, key crypto.PrivateKey) ([]byte, error) {
+func verifyAndDecrypt(draft int, jwe string, kp KeyProvider) ([]byte, error) {
 	parts := strings.Split(jwe, ".")
 	if len(parts) != 5 {
 		return nil, errors.New("Wrong number of parts")
 	}
 
 	// decode the JWE header
-	var header struct {
-		Alg Algorithm        `json:"alg"`
-		Enc EncryptionMethod `json:"enc"`
-		Zip string           `json:"zip"`
-	}
+	var header Header
 	data, err := safeDecode(parts[0])
 	if err != nil {
 		return nil, fmt.Errorf("Malformed header: %v", err)
@@ -95,6 +116,12 @@ func verifyAndDecrypt(draft int, jwe string, key crypto.PrivateKey) ([]byte, err
 	err = json.Unmarshal(data, &header)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to decode header: %v", err)
+	}
+
+	// acquire the private key
+	key, err := kp.GetKey(header)
+	if err != nil {
+		return nil, fmt.Errorf("Key provider refused to provide a private key: %v", err)
 	}
 
 	var encryptionKey []byte
