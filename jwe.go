@@ -173,11 +173,21 @@ func verifyAndDecrypt(draft int, jwe string, key crypto.PrivateKey) ([]byte, err
 	var plainText []byte
 
 	switch header.Enc {
-	case ENC_A128CBC_HS256:
-		encKey, macKey := encryptionKey[16:], encryptionKey[:16]
+	case ENC_A128CBC_HS256, ENC_A256CBC_HS512:
+		var encKey, macKey []byte
+		var hfunc func() hash.Hash
+		if header.Enc == ENC_A128CBC_HS256 {
+			encKey, macKey = encryptionKey[16:], encryptionKey[:16]
+			hfunc = sha256.New
+		} else if header.Enc == ENC_A256CBC_HS512 {
+			encKey, macKey = encryptionKey[32:], encryptionKey[:32]
+			hfunc = sha512.New
+		} else {
+			panic("Bad ENC logic for " + header.Enc)
+		}
 
 		// verify authtag
-		hm := hmac.New(sha256.New, macKey)
+		hm := hmac.New(hfunc, macKey)
 		io.WriteString(hm, parts[0])
 		hm.Write(iv)
 		hm.Write(cipherText)
