@@ -72,6 +72,12 @@ type Header struct {
 	Alg Algorithm        `json:"alg"`
 	Enc EncryptionMethod `json:"enc"`
 	Zip string           `json:"zip"`
+	Jku string           `json:"jku,omitempty"`
+	Jwk string           `json:"jwk,omitempty"`
+	X5u string           `json:"x5u,omitempty"`
+	X5t string           `json:"x5t,omitempty"`
+	X5c string           `json:"x5c,omitempty"`
+	Kid string           `json:"kid,omitempty"`
 }
 
 // interface to retrieve the private key needed to decrypt the JWE
