@@ -26,10 +26,13 @@ package gojwe
 
 import (
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/binary"
+	"hash"
 )
 
 // concat key derivation function
+//  See: 5.8.1 of NIST.800-56A
 func concatKDF(masterKey []byte, keyType string, encKeySize, macKeySize int) ([]byte, []byte) {
 
 	// build buffer common to encryption and integrity derivation
@@ -44,7 +47,14 @@ func concatKDF(masterKey []byte, keyType string, encKeySize, macKeySize int) ([]
 	binary.BigEndian.PutUint32(buffer[4+len(masterKey):], uint32(encKeySize))
 	copy(buffer[16+len(masterKey)+len(keyType):], "Encryption")
 
-	h := sha256.New()
+	var h hash.Hash
+	if macKeySize == 256 {
+		h = sha256.New()
+	} else if macKeySize == 512 {
+		h = sha512.New()
+	} else {
+		panic("Unknown hash size")
+	}
 	h.Write(buffer)
 	encKey := h.Sum(nil)
 
