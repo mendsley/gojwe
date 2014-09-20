@@ -106,6 +106,17 @@ func VerifyAndDecryptDraft7(jwe string, key crypto.PrivateKey) ([]byte, error) {
 			return nil, fmt.Errorf("Failed to decrypt encryption key: %v", err)
 		}
 
+	case "A128KW", "A256KW":
+		aesKey, ok := key.([]byte)
+		if !ok {
+			return nil, fmt.Errorf("Expected shared symmetric key ([]byte). Got %T", key)
+		}
+
+		encryptionKey, err = AesKeyUnwrap(aesKey, encryptionKeyData)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to unwrap key: %v", err)
+		}
+
 	default:
 		return nil, fmt.Errorf("Unsupported ALG keytype %s", header.Alg)
 	}

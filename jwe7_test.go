@@ -164,3 +164,18 @@ func TestDecode7_RSAES_PKCS1_V1_5_AES_CBC(t *testing.T) {
 		t.Fatal("Wrong decrypted text: %v", data)
 	}
 }
+
+// A.3 - Example HWE using AES Key Wrap and AES GCM
+func TestDecode7_AES_WRAP_AES_GCM(t *testing.T) {
+	const jwe = `eyJhbGciOiJBMTI4S1ciLCJlbmMiOiJBMTI4R0NNIn0.pP_7AUDIQcgixVGPK9PwJr-htXV3RCxQ._dxQGaaYsqhhY0NZ.4wxZhLkQ-F2RVzWCX3M-aIpgbUd806VnymMVwQTiVOX-apDxJ1aUhKBoWOjkbVUHVlCGaqYYXMfSvJm72kXj.miNQayWUUQZnBDzOq6VxQw`
+	privKey := []byte{25, 172, 32, 130, 225, 114, 26, 181, 138, 106, 254, 192, 95, 133,
+		74, 82}
+
+	data, err := VerifyAndDecryptDraft7(jwe, privKey)
+	if err != nil {
+		t.Fatal("VerifyAndDecryptDraft7 failed: ", err)
+	}
+	if string(data) != "The true sign of intelligence is not knowledge but imagination." {
+		t.Fatal("Wrong plaintext: %v", data)
+	}
+}
