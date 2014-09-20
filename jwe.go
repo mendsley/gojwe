@@ -45,6 +45,25 @@ import (
 	"strings"
 )
 
+type Algorithm string
+
+const (
+	ALG_RSA_OAEP     = Algorithm("RSA-OAEP")
+	ALG_RSA_OAEP_256 = Algorithm("RSA-OAEP-256")
+	ALG_RSA1_5       = Algorithm("RSA1_5")
+	ALG_A128KW       = Algorithm("A128KW")
+	ALG_A256KW       = Algorithm("A256KW")
+)
+
+type EncryptionMethod string
+
+const (
+	ENC_A128CBC_HS256_v7 = EncryptionMethod("A128CBC+HS256")
+	ENC_A256CBC_HS512_v7 = EncryptionMethod("A256CBC+H512")
+	ENC_A128GCM          = EncryptionMethod("A128GCM")
+	ENC_A256GCM          = EncryptionMethod("A256GCM")
+)
+
 // Verify and decrypt a draft-7 JWE object
 func VerifyAndDecryptDraft7(jwe string, key crypto.PrivateKey) ([]byte, error) {
 	parts := strings.Split(jwe, ".")
@@ -54,9 +73,9 @@ func VerifyAndDecryptDraft7(jwe string, key crypto.PrivateKey) ([]byte, error) {
 
 	// decode the JWE header
 	var header struct {
-		Alg string `json:"alg"`
-		Enc string `json:"enc"`
-		Zip string `json:"zip"`
+		Alg Algorithm        `json:"alg"`
+		Enc EncryptionMethod `json:"enc"`
+		Zip string           `json:"zip"`
 	}
 	data, err := safeDecode(parts[0])
 	if err != nil {
@@ -75,16 +94,16 @@ func VerifyAndDecryptDraft7(jwe string, key crypto.PrivateKey) ([]byte, error) {
 
 	// decode the encryption key
 	switch header.Alg {
-	case "RSA-OAEP", "RSA-OAEP-256":
+	case ALG_RSA_OAEP, ALG_RSA_OAEP_256:
 		rsaKey, ok := key.(*rsa.PrivateKey)
 		if !ok {
 			return nil, fmt.Errorf("Expected an RSA private key. Got %T", key)
 		}
 
 		var h hash.Hash
-		if header.Alg == "RSA-OAEP" {
+		if header.Alg == ALG_RSA_OAEP {
 			h = sha1.New()
-		} else if header.Alg == "RSA-OAEP-256" {
+		} else if header.Alg == ALG_RSA_OAEP_256 {
 			h = sha256.New()
 		} else {
 			panic("Logic error with algorithm " + header.Alg)
@@ -95,7 +114,7 @@ func VerifyAndDecryptDraft7(jwe string, key crypto.PrivateKey) ([]byte, error) {
 			return nil, fmt.Errorf("Failed to decrypt encryption key: %v", err)
 		}
 
-	case "RSA1_5":
+	case ALG_RSA1_5:
 		rsaKey, ok := key.(*rsa.PrivateKey)
 		if !ok {
 			return nil, fmt.Errorf("Expected RSA private key. Got %T", key)
@@ -106,7 +125,7 @@ func VerifyAndDecryptDraft7(jwe string, key crypto.PrivateKey) ([]byte, error) {
 			return nil, fmt.Errorf("Failed to decrypt encryption key: %v", err)
 		}
 
-	case "A128KW", "A256KW":
+	case ALG_A128KW, ALG_A256KW:
 		aesKey, ok := key.([]byte)
 		if !ok {
 			return nil, fmt.Errorf("Expected shared symmetric key ([]byte). Got %T", key)
@@ -143,21 +162,21 @@ func VerifyAndDecryptDraft7(jwe string, key crypto.PrivateKey) ([]byte, error) {
 	var plainText []byte
 
 	switch header.Enc {
-	case "A128CBC+HS256", "A256CBC+HS512":
+	case ENC_A128CBC_HS256_v7, ENC_A256CBC_HS512_v7:
 		// derive keys
 		var encSize, macSize int
 		var hfunc func() hash.Hash
-		if header.Enc == "A128CBC+HS256" {
+		if header.Enc == ENC_A128CBC_HS256_v7 {
 			encSize, macSize = 128, 256
 			hfunc = sha256.New
-		} else if header.Enc == "A256CBC+HS512" {
+		} else if header.Enc == ENC_A256CBC_HS512_v7 {
 			encSize, macSize = 256, 512
 			hfunc = sha512.New
 		} else {
 			panic("Bad ENC logic for type: " + header.Enc)
 		}
 
-		encKey, macKey := concatKDF(encryptionKey, header.Enc, encSize, macSize)
+		encKey, macKey := concatKDF(encryptionKey, string(header.Enc), encSize, macSize)
 
 		// verify authtag
 		hm := hmac.New(hfunc, macKey)
@@ -186,7 +205,7 @@ func VerifyAndDecryptDraft7(jwe string, key crypto.PrivateKey) ([]byte, error) {
 		padding := int(plainText[len(plainText)-1])
 		plainText = plainText[:len(plainText)-padding]
 
-	case "A128GCM", "A256GCM":
+	case ENC_A128GCM, ENC_A256GCM:
 		// create the "additional data" for the GCM cipher
 		additionalData := new(bytes.Buffer)
 		additionalData.WriteString(parts[0])
