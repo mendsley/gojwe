@@ -159,10 +159,10 @@ func VerifyAndDecryptDraft7(jwe string, key crypto.PrivateKey) ([]byte, error) {
 			return nil, errors.New("Integrity check failed")
 		}
 
-		// decrpyt ciphertext (can be done in-place)
+		// decrpyt ciphertext (in-place)
 		block, err := aes.NewCipher(encKey)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to create an AES block encryptor: %v", err)
+			return nil, fmt.Errorf("Failed to create an AES block cipher: %v", err)
 		}
 
 		c := cipher.NewCBCDecrypter(block, iv)
@@ -172,6 +172,32 @@ func VerifyAndDecryptDraft7(jwe string, key crypto.PrivateKey) ([]byte, error) {
 		// remove PCKS#7 padding
 		padding := int(plainText[len(plainText)-1])
 		plainText = plainText[:len(plainText)-padding]
+
+	case "A128GCM", "A256GCM":
+		// create the "additional data" for the GCM cipher
+		additionalData := new(bytes.Buffer)
+		additionalData.WriteString(parts[0])
+		additionalData.WriteRune('.')
+		additionalData.WriteString(parts[1])
+		additionalData.WriteRune('.')
+		additionalData.WriteString(parts[2])
+
+		// create the authenticating cipher
+		block, err := aes.NewCipher(encryptionKey)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to create an AES block cipher: %v", err)
+		}
+		c, err := cipher.NewGCM(block)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to create GCM cipher: %v", err)
+		}
+
+		// decrypt the cipher text (in-place)
+		_, err = c.Open(cipherText[:0], iv, append(cipherText, authTag...), additionalData.Bytes())
+		if err != nil {
+			return nil, fmt.Errorf("Failed to decrypt: %v", err)
+		}
+		plainText = cipherText
 
 	default:
 		return nil, fmt.Errorf("Unsupported ENC keytype %s", header.Enc)
