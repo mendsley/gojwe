@@ -87,7 +87,7 @@ func VerifyAndDecryptDraft7(jwe string, key crypto.PrivateKey) ([]byte, error) {
 		} else if header.Alg == "RSA-OAEP-256" {
 			h = sha256.New()
 		} else {
-			return nil, fmt.Errorf("Unknown RSA-OAEP keytype %s", header.Alg)
+			panic("Logic error with algorithm " + header.Alg)
 		}
 
 		encryptionKey, err = rsa.DecryptOAEP(h, rand.Reader, rsaKey, encryptionKeyData, nil)
